@@ -1,0 +1,3 @@
+Surface: shell metacharacters in user-provided text.
+Input: lab1-demo > /tmp/lab1_t4_redirect.marker; /usr/bin/id -u >> /tmp/lab1_t4_redirect.marker
+Effect in this lab: redirects output to a harmless /tmp marker.

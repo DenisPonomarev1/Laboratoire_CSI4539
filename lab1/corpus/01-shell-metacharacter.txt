@@ -1,0 +1,3 @@
+Surface: user argument passed to the vulnerable shell mode.
+Input: lab1-demo; /usr/bin/id -u > /tmp/lab1_t4_injection.marker
+Effect in this lab: creates a marker containing the injected command's effective UID.

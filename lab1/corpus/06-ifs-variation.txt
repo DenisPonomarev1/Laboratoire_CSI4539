@@ -1,0 +1,3 @@
+Surface: IFS inherited from the caller's environment.
+Environment: IFS=:
+Effect and limit: records an environment assumption for analysis; modern shells may reset or ignore IFS in privileged contexts, so this case is not relied upon as a successful exploit.

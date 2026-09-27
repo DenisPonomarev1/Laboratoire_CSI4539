@@ -1,0 +1,3 @@
+PASS: all real/effective/saved UIDs are dropped before execve.
+PASS: external command uses an absolute path.
+PASS: execve receives a fixed PATH/IFS allowlist.

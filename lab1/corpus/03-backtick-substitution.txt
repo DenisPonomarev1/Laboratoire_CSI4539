@@ -1,0 +1,3 @@
+Surface: user argument interpreted by Bash legacy command substitution.
+Input: ` /usr/bin/id -u > /tmp/lab1_t4_backtick.marker `
+Effect in this lab: executes the enclosed command; whitespace inside the backticks is intentional.

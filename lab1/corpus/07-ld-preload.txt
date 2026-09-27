@@ -1,0 +1,3 @@
+Surface: dynamic-linker environment handling.
+Environment: LD_PRELOAD=<absolute path to build/liblab1_preload.so>
+Effect and limit: the loader ignores LD_PRELOAD in secure-execution mode for Set-UID programs; test T6 verifies the marker is absent.

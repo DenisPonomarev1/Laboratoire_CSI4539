@@ -1,0 +1,3 @@
+Surface: PATH consulted by execvp("lab1-helper", ...).
+Environment: PATH=<attacker-controlled-directory>
+Effect in this lab: selects the compiled lab1-helper marker program from build/path.
