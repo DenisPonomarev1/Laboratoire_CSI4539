@@ -7,6 +7,7 @@ SHARED_DIR=/home/lab1_shared
 TRACE="$ROOT_DIR/traces/T1-permissions-umask.log"
 FILE_0002="$SHARED_DIR/t1_umask_0002.txt"
 FILE_0027="$SHARED_DIR/t1_umask_0027.txt"
+FILE_BOB="$SHARED_DIR/t1_bob.txt"
 
 mkdir -p "$ROOT_DIR/traces"
 exec > >(tee "$TRACE") 2>&1
@@ -15,7 +16,7 @@ printf '%s\n' '=== T1: Shared directory, umask, and sticky bit ==='
 printf '%s\n' 'Commands: sudo -u lab1_alice /bin/id; create files with umask 0002 and umask 0027.'
 sudo -u lab1_alice -- /bin/id
 sudo -u lab1_bob -- /bin/id
-sudo rm -f "$FILE_0002" "$FILE_0027"
+sudo rm -f "$FILE_0002" "$FILE_0027" "$FILE_BOB"
 sudo -u lab1_alice -- /bin/bash -c '
     set -eu
     cd "$1"
@@ -27,10 +28,17 @@ sudo -u lab1_alice -- /bin/bash -c '
     umask
     printf "%s\n" "created with umask 0027" > t1_umask_0027.txt
 ' _ "$SHARED_DIR"
+sudo -u lab1_bob -- /bin/bash -c '
+    set -eu
+    cd "$1"
+    umask 0002
+    umask
+    printf "%s\n" "created by Bob with umask 0002" > t1_bob.txt
+' _ "$SHARED_DIR"
 
 printf '\n%s\n' '=== Directory and file modes ==='
 ls -ld "$SHARED_DIR"
-ls -l "$FILE_0002" "$FILE_0027"
+ls -l "$FILE_0002" "$FILE_0027" "$FILE_BOB"
 getfacl -p "$SHARED_DIR"
 
 printf '\n%s\n' '=== Sticky-bit deletion check (Bob deleting Alice file) ==='
