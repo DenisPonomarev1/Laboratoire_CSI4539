@@ -14,7 +14,7 @@ cd "$LAB_DIR"
 
 MARKER=/tmp/pwned_t5.txt
 EVIL_DIR=/tmp/evilbin
-rm -f "$MARKER"
+sudo rm -f "$MARKER"
 rm -rf "$EVIL_DIR"
 mkdir -p "$EVIL_DIR"
 
@@ -80,7 +80,7 @@ if [ -f "$MARKER" ]; then
     echo "    /usr/bin/id, avec le privilege root de catall, uniquement"
     echo "    parce que le shell a resolu le nom via PATH -- une variable"
     echo "    entierement controlee par l'utilisateur invoquant."
-    rm -f "$MARKER"
+    sudo rm -f "$MARKER"
 
 else
     echo "ECHEC : le fichier marqueur n'a pas ete cree."

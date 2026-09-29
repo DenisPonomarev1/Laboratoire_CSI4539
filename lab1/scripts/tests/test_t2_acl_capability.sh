@@ -16,7 +16,7 @@ printf 'Command: bash %s\n' "$ROOT_DIR/scripts/setup/setup_e3_acl_capabilities.s
 bash "$ROOT_DIR/scripts/setup/setup_e3_acl_capabilities.sh"
 printf '\n%s\n' '=== ACL proof and Charlie access ==='
 printf 'Commands: getfacl -p %s %s; sudo -u lab1_charlie /bin/cat %s\n' "$SHARED_DIR" "$ACL_FILE" "$ACL_FILE"
-getfacl -p "$SHARED_DIR" "$ACL_FILE"
+sudo getfacl -p "$SHARED_DIR" "$ACL_FILE"
 sudo -u lab1_charlie -- /bin/cat "$ACL_FILE"
 printf '\n%s\n' '=== Capability proof; no Set-UID bit ==='
 printf 'Commands: stat -c ... %s; getcap %s; sudo -u lab1_alice %s\n' "$CAP_PROBE" "$CAP_PROBE" "$CAP_PROBE"

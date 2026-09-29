@@ -11,7 +11,7 @@ LAB_DIR="$(cd "$(dirname "$0")/../../Labsetup" && pwd)"
 cd "$LAB_DIR"
 
 MARKER=/tmp/pwned_t4.txt
-rm -f "$MARKER"
+sudo rm -f "$MARKER"
 
 echo "=== Utilisateur invoquant ==="
 whoami
@@ -65,7 +65,7 @@ if [ -f "$MARKER" ]; then
     echo "--> La commande injectee s'est bien executee."
     echo "    L'identite affichee permet de verifier le privilege effectif"
     echo "    dont elle dispose."
-    rm -f "$MARKER"
+    sudo rm -f "$MARKER"
 
 else
     echo "ECHEC : le fichier marqueur n'a pas ete cree."
