@@ -1,0 +1,58 @@
+=== T2: Configure E3 ACL and capability ===
+Command: bash /home/seed/Laboratoire_CSI4539/lab1/scripts/setup/setup_e3_acl_capabilities.sh
+=== E3: Grant Charlie read-only ACL access ===
+# file: /home/lab1_shared
+# owner: root
+# group: lab1_shared
+# flags: -st
+user::rwx
+user:lab1_charlie:--x
+group::rwx
+mask::rwx
+other::---
+
+# file: /home/lab1_shared/acl_sample.txt
+# owner: root
+# group: lab1_shared
+user::rw-
+user:lab1_charlie:r--
+group::r--
+mask::r--
+other::---
+
+ACL sample readable by the named ACL user.
+
+=== E3: Grant only cap_net_raw to the probe ===
+-rwxr-xr-x (755) root:root /usr/local/lib/lab1/lab1_cap_probe
+/usr/local/lib/lab1/lab1_cap_probe cap_net_raw=ep
+Raw ICMP socket opened (uid=1001, euid=1001) with CAP_NET_RAW.
+
+=== ACL proof and Charlie access ===
+Commands: getfacl -p /home/lab1_shared /home/lab1_shared/acl_sample.txt; sudo -u lab1_charlie /bin/cat /home/lab1_shared/acl_sample.txt
+# file: /home/lab1_shared
+# owner: root
+# group: lab1_shared
+# flags: -st
+user::rwx
+user:lab1_charlie:--x
+group::rwx
+mask::rwx
+other::---
+
+# file: /home/lab1_shared/acl_sample.txt
+# owner: root
+# group: lab1_shared
+user::rw-
+user:lab1_charlie:r--
+group::r--
+mask::r--
+other::---
+
+ACL sample readable by the named ACL user.
+
+=== Capability proof; no Set-UID bit ===
+Commands: stat -c ... /usr/local/lib/lab1/lab1_cap_probe; getcap /usr/local/lib/lab1/lab1_cap_probe; sudo -u lab1_alice /usr/local/lib/lab1/lab1_cap_probe
+-rwxr-xr-x (755) root:root /usr/local/lib/lab1/lab1_cap_probe
+/usr/local/lib/lab1/lab1_cap_probe cap_net_raw=ep
+uid=1001(lab1_alice) gid=1003(lab1_alice) groups=1003(lab1_alice),1001(lab1_shared)
+Raw ICMP socket opened (uid=1001, euid=1001) with CAP_NET_RAW.

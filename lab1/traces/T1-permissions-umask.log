@@ -1,0 +1,30 @@
+=== T1: Shared directory, umask, and sticky bit ===
+Commands: sudo -u lab1_alice /bin/id; create files with umask 0002 and umask 0027.
+uid=1001(lab1_alice) gid=1003(lab1_alice) groups=1003(lab1_alice),1001(lab1_shared)
+uid=1002(lab1_bob) gid=1004(lab1_bob) groups=1004(lab1_bob),1001(lab1_shared)
+0022
+0002
+0027
+0002
+
+=== Directory and file modes ===
+drwxrws--T+ 2 root lab1_shared 4096 Sep 29 13:47 /home/lab1_shared
+-rw-rw-r-- 1 lab1_bob   lab1_shared 31 Sep 29 13:47 /home/lab1_shared/t1_bob.txt
+-rw-rw-r-- 1 lab1_alice lab1_shared 24 Sep 29 13:47 /home/lab1_shared/t1_umask_0002.txt
+-rw-r----- 1 lab1_alice lab1_shared 24 Sep 29 13:47 /home/lab1_shared/t1_umask_0027.txt
+# file: /home/lab1_shared
+# owner: root
+# group: lab1_shared
+# flags: -st
+user::rwx
+user:lab1_charlie:--x
+group::rwx
+mask::rwx
+other::---
+
+
+=== Sticky-bit deletion check (Bob deleting Alice file) ===
+Command: sudo -u lab1_bob -- /bin/rm /home/lab1_shared/t1_umask_0002.txt
+rm: cannot remove '/home/lab1_shared/t1_umask_0002.txt': Operation not permitted
+EXPECTED: Bob could not delete Alice file in the sticky directory.
+-rw-rw-r-- 1 lab1_alice lab1_shared 24 Sep 29 13:47 /home/lab1_shared/t1_umask_0002.txt
