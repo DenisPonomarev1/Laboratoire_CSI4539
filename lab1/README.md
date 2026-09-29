@@ -18,6 +18,7 @@ values to `/tmp`.
 - `scripts/attacks/`: controlled exploit scripts for T4 and T5.
 - `scripts/tests/`: T1-T3 and T6-T9 repeatable checks; each writes a trace under `traces/`.
 - `corpus/`: eight documented dangerous inputs and environment cases.
+- `E5_ANALYSIS.md`: analysis of the three input surfaces required by E5.
 - `REPORT_TEMPLATE.md`: report outline and evidence checklist; fill in observed results and team-specific facts.
 
 The existing `JOURNAL.md` is one directory above this workspace. Update it
@@ -99,20 +100,19 @@ The vulnerable program therefore starts with the caller's real UID and root
 effective/saved UIDs. `system()` or another shell invocation is not what raises
 privilege; the Set-UID `execve()` transition does.
 
-The vulnerable `shell` mode concatenates untrusted argument text into Bash
-code. Bash is invoked with `-p` so the intentionally vulnerable demonstration
-retains the effective UID in current Ubuntu/Debian lab images, where a plain
-`system()`/`/bin/sh` may discard it. The `lookup` mode instead calls `execvp`
-with a bare program name, causing PATH substitution. These are isolated test
-surfaces, not recommended production patterns.
+The legacy `Labsetup/catall.c` treats `argv[1]` as a filename, but concatenates
+it without quoting into `/bin/cat <argument>` and passes that string to
+`system()`. The shell therefore parses attacker-controlled filename text as
+shell syntax. The actual shell used by `system()` is `/bin/sh`; the T4/T5
+scripts temporarily point it to zsh because some `/bin/sh` implementations
+drop Set-UID privileges. This shell behavior is platform-dependent and is not
+what grants the initial privilege: the kernel does that when it executes the
+root-owned Set-UID binary. See [E5_ANALYSIS.md](E5_ANALYSIS.md) for the E5
+surface-by-surface analysis.
 
-The implicit E5 assumptions to discuss are:
-
-| Surface | Vulnerable assumption | Observation |
-| --- | --- | --- |
-| Argument data | An argument is inert text and cannot change a command's structure. | False in `shell` mode: the text is concatenated into Bash source. |
-| PATH / IFS | A bare executable name and inherited shell environment resolve safely. | False for PATH: `execvp` searches caller-controlled directories. IFS is not validated; modern privileged shells may reset or ignore it, so this corpus case is not claimed as a successful exploit. |
-| Dynamic linking | Caller-provided loader variables cannot affect privileged execution, or are safe to honor. | Secure-execution mode ignores/restricts variables such as `LD_PRELOAD` and `LD_LIBRARY_PATH`; T6 demonstrates the loader's protection boundary. |
+The fixed `Labsetup/catall_fixed.c` instead passes the argument as one `execve`
+argument to `/bin/cat`, without invoking a shell. It does not depend on a bare
+command name or an inherited shell environment for that operation.
 
 The fixed program performs no privileged external work. It calls
 `setresuid(real, real, real)` before `execve`, permanently replacing real,

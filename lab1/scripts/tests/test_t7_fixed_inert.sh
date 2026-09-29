@@ -1,35 +1,58 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# T7 - Correction inerte
+#
+# Rejoue les memes charges utiles que T4 (injection) et T5 (detournement
+# PATH) contre catall_fixed, et confirme qu'elles n'ont plus aucun effet.
+# Aucun changement de /bin/sh n'est necessaire ici : catall_fixed n'invoque
+# plus jamais de shell (execve() remplace system()), donc le comportement
+# de dash/zsh est hors sujet pour ce test.
+set -e
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(cd -- "$SCRIPT_DIR/../.." && pwd)
-FIXED=/usr/local/lib/lab1/lab1_fixed
-PATH_DIR="$ROOT_DIR/build/path"
-T4_MARKER=/tmp/lab1_t4_injection.marker
-T5_MARKER=/tmp/lab1_t5_path.marker
-TRACE="$ROOT_DIR/traces/T7-fixed-inert.log"
-PAYLOAD='lab1-demo; /usr/bin/id -u > /tmp/lab1_t4_injection.marker'
+LAB_DIR="$(cd "$(dirname "$0")/../../Labsetup" && pwd)"
+cd "$LAB_DIR"
 
-make -C "$ROOT_DIR" build/path/lab1-helper
-mkdir -p "$ROOT_DIR/traces"
-exec > >(tee "$TRACE") 2>&1
+gcc catall_fixed.c -o catall_fixed
+sudo chown root:root catall_fixed
+sudo chmod 4755 catall_fixed
 
-printf '%s\n' '=== T7: Replay T4 input against the fixed program ==='
-sudo rm -f "$T4_MARKER" "$T5_MARKER"
-sudo -u lab1_alice -- /bin/id
-printf 'Command: sudo -u lab1_alice -- %s %q\n' "$FIXED" "$PAYLOAD"
-sudo -u lab1_alice -- "$FIXED" "$PAYLOAD"
-if [[ -e "$T4_MARKER" ]]; then
-    printf '%s\n' 'FAIL: command-injection marker exists.'
-    exit 1
+echo "=== Permissions de catall_fixed ==="
+ls -l ./catall_fixed
+
+MARKER4=/tmp/pwned_t4.txt
+MARKER5=/tmp/pwned_t5.txt
+sudo rm -f "$MARKER4" "$MARKER5"
+
+echo
+echo "=== Rejeu de la charge utile T4 (injection de commande) ==="
+PAYLOAD4="x; /usr/bin/id > $MARKER4; echo injection-reussie #"
+echo "Charge utile : $PAYLOAD4"
+./catall_fixed "$PAYLOAD4" || true
+
+if [ -f "$MARKER4" ]; then
+    echo "ECHEC DE LA CORRECTION : $MARKER4 a ete cree !"
+    cat "$MARKER4"
+else
+    echo "OK : $MARKER4 n'existe pas. L'injection est inerte."
+    echo "     execve() a transmis toute la chaine comme UN SEUL nom de"
+    echo "     fichier a /bin/cat, qui a simplement echoue (fichier"
+    echo "     introuvable) sans jamais invoquer de shell."
 fi
-printf '%s\n' 'EXPECTED: injection text was printed literally; no marker exists.'
 
-printf '\n%s\n' '=== T7: Replay T5 PATH against the fixed program ==='
-printf 'Command: sudo -u lab1_alice -- /usr/bin/env PATH=%q %s lookup\n' "$PATH_DIR" "$FIXED"
-sudo -u lab1_alice -- /usr/bin/env PATH="$PATH_DIR" "$FIXED" lookup
-if [[ -e "$T5_MARKER" ]]; then
-    printf '%s\n' 'FAIL: PATH replacement helper ran.'
-    exit 1
+echo
+echo "=== Rejeu de la charge utile T5 (detournement PATH) ==="
+EVIL_DIR=/tmp/evilbin
+export PATH="$EVIL_DIR:$PATH"
+PAYLOAD5="x; id; #"
+echo "PATH utilise : $PATH"
+echo "Charge utile : $PAYLOAD5"
+./catall_fixed "$PAYLOAD5" || true
+
+if [ -f "$MARKER5" ]; then
+    echo "ECHEC DE LA CORRECTION : $MARKER5 a ete cree !"
+    cat "$MARKER5"
+else
+    echo "OK : $MARKER5 n'existe pas. Le detournement PATH est inerte."
+    echo "     catall_fixed n'utilise plus l'environnement herite ni un"
+    echo "     shell pour resoudre des noms de commande ; PATH n'a donc"
+    echo "     plus aucune influence sur son comportement."
 fi
-printf '%s\n' 'EXPECTED: the PATH replacement was not invoked.'

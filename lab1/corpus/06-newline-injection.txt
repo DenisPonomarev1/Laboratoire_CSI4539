@@ -1,0 +1,6 @@
+Surface : argument utilisateur (argv[1]) interprete par /bin/sh, qui
+traite le saut de ligne comme separateur de commandes au meme titre
+que ';'.
+Entree : x[LF]id   (LF = octet de saut de ligne reel, ex. via $'x\nid')
+Effet : le saut de ligne separe deux commandes distinctes, meme sans
+metacaractere ';' visible.

@@ -1,0 +1,9 @@
+Surface : gestion de l'environnement par l'editeur de liens dynamique
+(LD_PRELOAD), teste contre catall (Set-UID root) et contre une copie
+non Set-UID a des fins de comparaison.
+Entree : LD_PRELOAD=/tmp/preload_marker.so ./catall fichier.txt
+Effet et limite : demontre en T6. Contre la copie non Set-UID, le
+constructeur de la bibliotheque preremplie s'execute (preuve que le
+mecanisme fonctionne). Contre catall (Set-UID root), le chargeur
+dynamique ignore silencieusement LD_PRELOAD en mode d'execution
+securisee -- aucun detournement ne se produit.

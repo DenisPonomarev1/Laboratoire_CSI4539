@@ -1,0 +1,5 @@
+Surface : argument utilisateur (argv[1]) interprete par /bin/sh une
+fois transmis a system() dans catall.c.
+Entree : x | id
+Effet : le tube '|' redirige la sortie de la premiere commande vers
+"id", executant "id" comme seconde commande de la chaine.
