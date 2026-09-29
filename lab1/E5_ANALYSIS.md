@@ -42,11 +42,12 @@ privilégiée pour empêcher le chargement de bibliothèques non fiables.
 Lorsqu’un utilisateur non privilégié exécute un binaire Set-UID appartenant à
 root, Linux active le mode d’exécution sécurisée. Dans ce mode, le chargeur
 dynamique ignore ou restreint des variables comme `LD_PRELOAD` et
-`LD_LIBRARY_PATH`. T6 vérifie cette limite : le constructeur de la
-bibliothèque préchargée s’exécute avec un binaire témoin sans Set-UID, mais ne
-devrait pas s’exécuter avec `catall` Set-UID. Cette protection vient du
-chargeur, et non d’une correction de `catall.c` ; elle n’empêche ni l’injection
-shell ni le détournement par `PATH`.
+`LD_LIBRARY_PATH`. T6 vérifie cette limite avec le programme `show_ids`, qui
+n’invoque aucun processus enfant : le constructeur de la bibliothèque
+préchargée s’exécute avec sa version sans Set-UID, mais ne devrait pas
+s’exécuter avec sa version Set-UID. Cette protection vient du chargeur, et non
+d’une correction de `catall.c` ; elle n’empêche ni l’injection shell ni le
+détournement par `PATH`.
 
 Les scripts T4/T5 remplacent temporairement la cible de `/bin/sh` par zsh, car
 certaines implémentations de `/bin/sh` abandonnent les privilèges Set-UID.
