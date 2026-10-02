@@ -1,0 +1,9 @@
+Surface : variable d'environnement PATH, consultee par /bin/sh (lance
+via system() dans catall.c) pour resoudre le nom de commande injecte
+en argv[1].
+Entree (argument) : x; id
+Environnement : PATH=/tmp/evilbin:$PATH  (repertoire attaquant place
+en tete, contenant un faux binaire "id")
+Effet : demontre en T5. Le shell resout "id" via le PATH controle par
+l'attaquant plutot que /usr/bin/id, executant le faux binaire avec le
+privilege de catall.

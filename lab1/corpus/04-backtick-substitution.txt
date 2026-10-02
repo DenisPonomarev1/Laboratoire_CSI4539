@@ -1,0 +1,6 @@
+Surface : argument utilisateur (argv[1]) interprete par /bin/sh
+(substitution de commande, syntaxe historique) une fois transmis a
+system() dans catall.c.
+Entree : `id`
+Effet : le shell execute la commande entre accents graves avant de
+construire la commande finale.

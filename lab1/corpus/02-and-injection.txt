@@ -1,0 +1,5 @@
+Surface : argument utilisateur (argv[1]) interprete par /bin/sh une
+fois transmis a system() dans catall.c.
+Entree : x && id
+Effet : le '&&' enchaine une seconde commande, executee uniquement si
+la premiere reussit -- variante de l'injection par ';'.

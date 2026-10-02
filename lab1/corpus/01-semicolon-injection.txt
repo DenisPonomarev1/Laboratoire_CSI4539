@@ -1,0 +1,6 @@
+Surface : argument utilisateur (argv[1]) concatene dans une chaine de
+commande shell par catall.c (sprintf), transmise a system().
+Entree : x; id
+Effet : le ';' termine la commande "/bin/cat x" prevue et demarre une
+seconde commande arbitraire ("id"), executee avec le privilege de
+catall.

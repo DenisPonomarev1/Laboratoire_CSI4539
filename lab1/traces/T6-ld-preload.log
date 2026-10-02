@@ -1,0 +1,13 @@
+=== T6: LD_PRELOAD and Set-UID secure execution ===
+=== Root-owned Set-UID probe ===
+Binary owner/mode: root:root -rwsr-xr-x
+=== Non-Set-UID control: constructor must run ===
+UID reel       (ruid) = 1000
+UID effectif   (euid) = 1000
+UID sauvegarde (suid) = 1000
+LD_PRELOAD constructor executed
+=== Root-owned Set-UID probe: constructor must not run ===
+UID reel       (ruid) = 1000
+UID effectif   (euid) = 0
+UID sauvegarde (suid) = 0
+PASS: the control loaded LD_PRELOAD; the Set-UID probe ran as root without loading it.

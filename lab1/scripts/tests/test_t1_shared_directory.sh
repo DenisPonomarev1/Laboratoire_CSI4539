@@ -38,8 +38,8 @@ sudo -u lab1_bob -- /bin/bash -c '
 
 printf '\n%s\n' '=== Directory and file modes ==='
 ls -ld "$SHARED_DIR"
-ls -l "$FILE_0002" "$FILE_0027" "$FILE_BOB"
-getfacl -p "$SHARED_DIR"
+sudo ls -l "$FILE_0002" "$FILE_0027" "$FILE_BOB"
+sudo getfacl -p "$SHARED_DIR"
 
 printf '\n%s\n' '=== Sticky-bit deletion check (Bob deleting Alice file) ==='
 printf 'Command: sudo -u lab1_bob -- /bin/rm %s\n' "$FILE_0002"
@@ -49,4 +49,4 @@ if sudo -u lab1_bob -- /bin/rm "$FILE_0002"; then
 else
     printf '%s\n' 'EXPECTED: Bob could not delete Alice file in the sticky directory.'
 fi
-ls -l "$FILE_0002"
+sudo ls -l "$FILE_0002"

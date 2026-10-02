@@ -1,18 +1,41 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# E4 / T3 - Distinction UID reel / effectif / sauvegarde
+#
+# Compile show_ids.c, l'installe comme binaire Set-UID root avec le
+# meme traitement que catall (chown root, chmod 4755), puis l'execute
+# en tant qu'utilisateur non privilegie pour observer l'elevation de
+# l'UID effectif imposee par le noyau.
+set -e
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(cd -- "$SCRIPT_DIR/../.." && pwd)
-VULN=/usr/local/lib/lab1/lab1_vuln
-TRACE="$ROOT_DIR/traces/T3-privilege-model.log"
+SRC=../../Labsetup/show_ids.c
+BIN=./show_ids
 
-mkdir -p "$ROOT_DIR/traces"
-exec > >(tee "$TRACE") 2>&1
+if [ ! -f "$SRC" ]; then
+  echo "ERREUR: $SRC introuvable. Executer ce script depuis le dossier Labsetup."
+  exit 1
+fi
 
-printf '%s\n' '=== T3: Real user identity ==='
-printf '%s\n' 'Command: sudo -u lab1_alice -- /bin/id'
-sudo -u lab1_alice -- /bin/id
-printf '\n%s\n' '=== T3: Set-UID program identity ==='
-printf 'Commands: stat -c ... %s; sudo -u lab1_alice %s identify\n' "$VULN" "$VULN"
-stat -c '%A (%a) %U:%G %n' "$VULN"
-sudo -u lab1_alice -- "$VULN" identify
+echo "=== Compilation de show_ids ==="
+gcc "$SRC" -o "$BIN"
+
+echo "=== Installation Set-UID root (meme traitement que catall) ==="
+sudo chown root:root "$BIN"
+sudo chmod 4755 "$BIN"
+ls -l "$BIN"
+
+echo
+echo "=== Utilisateur invoquant ==="
+whoami
+
+echo
+echo "=== UID reel / effectif / sauvegarde observes ==="
+"$BIN"
+
+echo
+echo "Interpretation : l'UID reel correspond a l'utilisateur qui a lance"
+echo "le programme; l'UID effectif est celui du proprietaire du fichier"
+echo "(root), impose par le noyau au moment de l'execve() a cause du bit"
+echo "Set-UID; l'UID sauvegarde permet au processus de retrouver ce"
+echo "privilege plus tard s'il l'abandonne temporairement. Ce meme"
+echo "mecanisme s'applique a catall, qui recoit le meme traitement"
+echo "(chown root + chmod 4755)."
