@@ -1,0 +1,28 @@
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+make stack-L1
+ls -l stack-L1 stack-L1-dbg
+file stack-L1
+printf '\0' > badfile
+gdb -q -x t1.gdb ./stack-L1-dbg
+
+# T2 / E2
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup
+make
+objdump -Mintel -d hello mysh64 another_sh64
+objcopy -O binary -j .text another_sh64 another_sh64.text.bin
+xxd -p -c 20 another_sh64.text.bin
+# Paste the xxd output into ori_sh in convert.py.
+nano convert.py
+python3 convert.py
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup/shellcode
+gcc -z execstack -o a64.out call_shellcode.c
+./a64.out
+# Type exit when the shell opens.
+
+# T3 / E3: Level 1 direct Set-UID demonstration
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+sudo sysctl -w kernel.randomize_va_space=0
+sysctl kernel.randomize_va_space
+python3 exploit.py
+xxd -g1 -s 112 -l 4 badfile
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1

