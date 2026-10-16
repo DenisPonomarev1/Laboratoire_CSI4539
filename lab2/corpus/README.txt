@@ -70,7 +70,7 @@ Effet       : demontre la gestion des octets nuls dans une adresse 64 bits
 
 06_retlibc_valid.bin
 ----------------------
-Source      : exploit.py (variante return-to-libc pour retlib.c)
+Source      : exploit_script.py (variante return-to-libc pour retlib.c)
 Contenu     : offsets X/Y/Z pointant vers system(), exit() et la chaine
               "/bin/sh" (variable d'environnement)
 Cible       : retlib (pile non executable active, StackGuard desactive)
@@ -85,9 +85,9 @@ Source      : copie de 06, adresse de retour remplacee par 0x41414141
 Cible       : retlib
 Propriete violee : integrite de l'adresse de retour
 Effet       : cas de test negatif. Confirme que l'ecrasement atteint bien
-              l'emplacement de l'adresse de retour (plantage immediat,
-              SIGSEGV) sans viser une fonction reelle -- utile pour valider
-              l'offset sans dependre d'une adresse systeme correcte
+              l'emplacement de l'adresse de retour (plantage apres l'obtention
+              du shell privilegie) sans viser une fonction reelle -- utile pour 
+              valider l'offset sans dependre d'une adresse systeme correcte
 
 
 08_retlibc_renamed.bin
