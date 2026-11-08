@@ -1,0 +1,23 @@
+Phase 1 of 2: generation of Global contracts ...
+Phase 2 of 2: flow analysis and proof ...
+validator.adb:5:19: info: range check proved
+validator.adb:50:29: info: range check proved
+validator.adb:53:10: info: range check proved
+validator.adb:53:18: info: index check proved
+validator.adb:53:28: info: range check proved
+validator.adb:53:28: info: index check proved
+validator.adb:53:37: info: length check proved
+validator.adb:53:40: info: length check proved
+validator.ads:10:06: info: data dependencies proved
+validator.ads:11:14: info: postcondition proved
+validator.ads:11:41: info: range check proved
+validator.ads:15:06: info: data dependencies proved
+validator.ads:19:06: info: data dependencies proved
+validator.ads:23:07: info: initialization of "Accepted" proved
+validator.ads:24:07: info: initialization of "Copied_Length" proved
+validator.ads:25:07: info: initialization of "Output" proved
+validator.ads:27:06: info: data dependencies proved
+validator.ads:28:06: info: flow dependencies proved
+validator.ads:33:08: info: postcondition proved
+validator.ads:34:33: info: range check proved
+Summary logged in /home/seed/Documents/Laboratoire/lab1_v2/lab3/spark_validator/obj/gnatprove/gnatprove.out

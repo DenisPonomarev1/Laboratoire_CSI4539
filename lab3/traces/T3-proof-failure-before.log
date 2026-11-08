@@ -1,0 +1,24 @@
+Phase 1 of 2: generation of Global contracts ...
+Phase 2 of 2: flow analysis and proof ...
+validator_failure.adb:5:19: info: range check proved
+validator_failure.adb:24:29: info: range check proved
+validator_failure.adb:27:10: info: range check proved
+validator_failure.adb:27:18: info: index check proved
+validator_failure.adb:27:28: info: range check proved
+validator_failure.adb:27:28: info: index check proved
+validator_failure.adb:27:37: info: length check proved
+validator_failure.adb:27:40: info: length check proved
+validator_failure.ads:9:14: info: postcondition proved
+validator_failure.ads:9:41: info: range check proved
+validator_failure.ads:13:07: info: initialization of "Accepted" proved
+validator_failure.ads:14:07: info: initialization of "Copied_Length" proved
+validator_failure.ads:15:07: info: initialization of "Output" proved
+validator_failure.ads:17:06: info: data dependencies proved
+validator_failure.ads:18:06: info: flow dependencies proved
+
+validator_failure.ads:24:12: medium: postcondition might fail, cannot prove Copied_Length = Input'Length + 1
+   24 |           Copied_Length = Input'Length + 1
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+validator_failure.ads:24:33: info: range check proved
+validator_failure.ads:24:41: info: overflow check proved
+Summary logged in /home/seed/Documents/Laboratoire/lab1_v2/lab3/proof_failure_demo/obj/gnatprove/gnatprove.out

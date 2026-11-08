@@ -1,0 +1,8 @@
+Compile
+   [Ada]          main.adb
+   [Ada]          validator.adb
+Bind
+   [gprbind]      main.bexch
+   [Ada]          main.ali
+Link
+   [link]         main.adb
